@@ -1,0 +1,9 @@
+secretGenerator:
+- name: mysql-pwd
+  namespace: tz
+  literals:
+  - password=P@ssw0rd!
+resources:
+  - ns.tz.yaml
+  - mysql-deployment.yaml
+  - wordpress-deployment.yaml

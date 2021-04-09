@@ -1,0 +1,61 @@
+#!/bin/bash
+
+_PARMS_=
+for i in "$@"
+do
+case $i in
+        -n)
+        NOMIRROR=NOMIRROR
+        shift
+        ;;
+        -m)
+        MIRRORONLY=MIRRORONLY
+        shift
+        ;;
+#        *)
+#        echo "-m -n first" && exit 1
+#        ;;
+esac
+done
+
+
+if [ ${MIRRORONLY} ]; then echo MIRROR ONLY
+  IFS='-' mirrored=( ${PWD##*/} )
+  IFS=' ' mirror="${mirrored}-mirror"
+  if [ -d ../${mirror} ] && [[ ${mirror} != ${PWD##*/} ]]; then
+#    echo "Doing ${mirror} with Parms: ${*}"
+    pushd ../${mirror} >/dev/null
+    /Users/brandonindia/Vagrant/prov ${*}
+    popd >/dev/null
+  fi
+else
+
+  if [ ! ${NOMIRROR} ]; then
+    IFS='-' mirrored=( ${PWD##*/} )
+    IFS=' ' mirror="${mirrored}-mirror"
+    if [ -d ../${mirror} ] && [[ ${mirror} != ${PWD##*/} ]]; then
+      echo "Doing ${mirror} with Parms: ${*}"
+      pushd ../${mirror} >/dev/null
+      /Users/brandonindia/Vagrant/prov ${*}&
+      popd >/dev/null
+    fi
+  else echo SKIPPING MIRROR #&& _PARMS_="${@}" && echo -e "\${_PARMS_} ${_PARMS_}" && echo -e "\${*} ${*}\t\${@} ${@}\n\n";
+  fi
+
+  for i in "$@"
+  do
+  case $i in
+          -p=*|-provision-with=*)
+          PROVISIONWITH="--provision-with ${i#*=}"
+          shift
+          ;;
+  esac
+  done
+
+
+  echo "Executing: vagrant provision ${@} ${PROVISIONWITH}"
+  if [ ${#} -gt 0 ];
+   then vagrant provision ${@} ${PROVISIONWITH}
+   else if [[ ! -z ${PROVISIONWITH} ]]; then vagrant provision ${PROVISIONWITH}; fi;
+  fi
+fi # END if [ ${MIRRORONLY} ];

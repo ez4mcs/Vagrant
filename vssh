@@ -1,0 +1,6 @@
+#!/bin/bash
+
+u=vagrant
+if [ $1 ]; then u=${1}; fi
+ssh ${u}@${PWD##*/}
+

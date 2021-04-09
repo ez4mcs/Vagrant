@@ -1,0 +1,6 @@
+K8S Dashboard
+User: admin-user
+URL: https://localhost:30002/#/login  <-- if blocked by NET::ERR_CERT_INVALID error
+                                          to bypass type into Chrome: thisisunsafe
+Token Command:
+kubectl -n kubernetes-dashboard describe secret $(kubectl -n kubernetes-dashboard get secret | grep admin-user | awk "{print \$1}")
