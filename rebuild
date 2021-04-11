@@ -8,7 +8,10 @@ if [ ${#} -eq 0 ]; then
    done
    boxes="master ${pods}"
    echo -n "Rebuilding env  " && blue "${PWD##*/}" && echo "  for ${boxes}"
-   for i in 3 2 1; do echo -e "\t\tin $i"; sleep 1; done
+
+     read -p "Go? (Y/n): " yn
+     yn=${yn:-Y}
+     if [[ ! $yn = "Y" ]]; then exit ${LINENO}; fi
    CMD="vagrant destroy -f ${boxes}" && ${CMD}
    CMD="up" && time ${CMD}
 else
