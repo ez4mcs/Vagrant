@@ -1,5 +1,11 @@
 #!/bin/bash
 
+###
+#
+# MEANT TO RUN FROM THE MOST, MIRRORED, DIRECTORY
+#
+###
+
 _PARMS_=
 for i in "$@"
 do
@@ -47,6 +53,11 @@ else
   case $i in
           -p=*|-provision-with=*)
           PROVISIONWITH="--provision-with ${i#*=}"
+          shift
+          ;;
+          -p|-provision-with|--provision-with)
+          shift
+          PROVISIONWITH="--provision-with ${1}"
           shift
           ;;
   esac
