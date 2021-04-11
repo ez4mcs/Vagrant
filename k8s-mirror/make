@@ -27,14 +27,7 @@ for dir in $(find ${base}/_shared_assets -type d|sed "s/\.\.\/\k8s-cluster/\./")
 	for f in $(ls -1 ${src}/); do if [ ! -d ${src}/${f} ]; then ln -fn ${src}/${f} ./${target}/${f}; fi; done
 done
 
-#dir=_shared_assets &&          target=./${dir} && src=${base}/${dir}
-#if [ ! -d ${target} ]; then mkdir ${target}; fi
-#for f in $(ls -1 ${src}/); do if [ ! -d ${src}/${f} ]; then ln -fn ${src}/${f} ./${target}/${f}; fi; done
-
-#dir=_shared_assets/techcraz && target=./${dir} && src=${base}/${dir}
-#if [ ! -d ${target} ]; then mkdir ${target}; fi
-#for f in $(ls -1 ${src}/); do if [ ! -d ${src}/${f} ]; then ln -fn ${src}/${f} ./${target}/${f}; fi; done
-
+# MIRROR NODE CT FILES, DONT TRACK CHANGES
 for f in CTLR_CT MSTR_CT POD_CT; do
 	cat ${base}/${f} >./${f}
 	git update-index --assume-unchanged ${f}
