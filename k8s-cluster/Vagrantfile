@@ -78,53 +78,53 @@ for i in (0..CTLR_CT+MSTR_CT+POD_CT - 1) do
    if "#{host_nm_pool[i]}".include? "#{MASTER}"; MASTERS += "#{host_ip_pool[i]} " ; end
 end
 
-# WRITES:   /usr/local/bin/ssh-*
-SSHPODNODES="podnodes"
-SSHALL="sshall"
-SSHMASTER="sshmaster"
-SSHRESETNODES="resetnodes"
-SSHJOINNODES="joinallnodes"
+# WRITES:   /usr/local/bin/
+SSH_PODNODES="podnodes"
+SSH_ALLCLUSTER="sshall"
+SSH_MASTER="sshmaster"
+SSH_RESETNODES="resetnodes"
+SSH_JOINNODES="joinallnodes"
 JOINNODE="joinnode"
 $BIN_RUNSSH = <<EOF
 DIR="/usr/local/bin"
 script_list=()
 
-FNAME="#{SSHPODNODES}"
+FNAME="#{SSH_PODNODES}"
 script_list+=("${FNAME}")
 echo -e "#!/bin/bash
-### #{SSHPODNODES} ####
+### #{SSH_PODNODES} ####
 if [ \\$\# -gt 0 ]; then for ip in #{PODS}; do ssh \\${ip} \\"\\${*}\\"; done;
 else echo -e \\" \\$(basename \\${0}) Usage: Need argument to send\\"; fi
 " > ${DIR}/${FNAME}
 
-FNAME=#{SSHALL}
+FNAME=#{SSH_ALLCLUSTER}
 script_list+=("${FNAME}")
 echo -e "#!/bin/bash
-### #{SSHALL} ####
+### #{SSH_ALLCLUSTER} ####
 if [ \\$\# -gt 0 ]; then for ip in #{IPLIST}; do ssh \\${ip} \\"\\${*}\\"; done;
 else echo -e \\" \\$(basename \\${0}) Usage: Need argument to send\\"; fi
 " > ${DIR}/${FNAME}
 
-FNAME=#{SSHMASTER}
+FNAME=#{SSH_MASTER}
 script_list+=("${FNAME}")
 echo -e "#!/bin/bash
-### #{SSHMASTER} ####
+### #{SSH_MASTER} ####
 if [ \\$\# -gt 0 ]; then for ip in #{MASTERS}; do ssh \\${ip} \\"\\${*}\\"; done;
 else echo -e \\" \\$(basename \\${0}) Usage: Need argument to send\\"; fi
 " > ${DIR}/${FNAME}
 
-FNAME=#{SSHRESETNODES}
+FNAME=#{SSH_RESETNODES}
 script_list+=("${FNAME}")
 echo -e "#!/bin/bash
-### #{SSHRESETNODES} ####
+### #{SSH_RESETNODES} ####
 if [ \\$\# -eq 0 ]; then for ip in #{PODS}; do echo Resetting node @ \\${ip} && echo && ssh \\${ip} \\"sudo su - -c 'kubeadm reset -f && rm -rf /joincluster'\\"; done
 else echo \\" Usage: Expect 0 args\\"; fi
 " > ${DIR}/${FNAME}
 
-FNAME=#{SSHJOINNODES}
+FNAME=#{SSH_JOINNODES}
 script_list+=("${FNAME}")
 echo -e "#!/bin/bash
-### #{SSHJOINNODES} ####
+### #{SSH_JOINNODES} ####
 if [ \\$\# -eq 0 ]; then for ip in #{PODS}; do ssh \\${ip} \\"echo && hostname -f && ./joincluster\\"; done
 else echo \\" Usage: Expect 0 args\\"; fi
 " > ${DIR}/${FNAME}
@@ -203,7 +203,7 @@ EOF
 
 $SYNCTEST_MASTER_ONLY = <<EOF
 echo #{MSG} Running: \\$SYNCTEST_MASTER_ONLY
-echo -e "#!/bin/bash\n#{SSHPODNODES} 's=\\\`hostname -f\\\` && echo -n \\"\`hostname\` to \\\${s} -> Success\\" && s=\\" and \\\`hostname\\\` back for -> Success\\" && ssh master \\"echo -n \\\\\\"\\\${s}\\\\\\" && hostname -f\\"'
+echo -e "#!/bin/bash\n#{SSH_PODNODES} 's=\\\`hostname -f\\\` && echo -n \\"\`hostname\` to \\\${s} -> Success\\" && s=\\" and \\\`hostname\\\` back for -> Success\\" && ssh master \\"echo -n \\\\\\"\\\${s}\\\\\\" && hostname -f\\"'
 " > /root/test-node-connections \
    && chown vagrant:vagrant /root/test-node-connections \
    && chmod 744 /root/test-node-connections \
@@ -363,7 +363,7 @@ function setup {
   if [ ${#thelist[@]} = 0 ]; then return 1; fi
   for d in ${thelist[@]}; do setup="${setup}${CMD} ${d} 2> /dev/null;"; done
     # echo "setup: ${setup}"
-  ${bin_dir}/#{SSHPODNODES} "${setup}"
+  ${bin_dir}/#{SSH_PODNODES} "${setup}"
 }
 ##################################################
 function verify {
@@ -372,7 +372,7 @@ function verify {
   for d in ${thelist[@]}; do setup="${setup}${CMD} ${d} 2> /dev/null;"; done
   RC=0 && for d in ${thelist[@]}; do verify="${verify}if ! ls ${d} >/dev/null 2>&1; then echo -n FAILED@ && echo \\\$(hostname -f) && exit 1; fi;"; done
     # echo "verify: ${verify}"
-  if ! ${bin_dir}/#{SSHPODNODES}  "${verify}"; then RC=99; fi;
+  if ! ${bin_dir}/#{SSH_PODNODES}  "${verify}"; then RC=99; fi;
   return ${RC}
 }
 ##################################################
@@ -382,7 +382,7 @@ function teardown {
   if [ ${#thelist[@]} = 0 ]; then return 0; fi
   for d in ${thelist[@]}; do teardown="${teardown}${CMD} ${d};"; done
     # echo "teardown: ${teardown}"
-  ${bin_dir}/#{SSHPODNODES}  "${teardown}";
+  ${bin_dir}/#{SSH_PODNODES}  "${teardown}";
 }
 ##################################################
 function do_nodeport {
@@ -544,7 +544,7 @@ function create_token {
 function wrapup {
   #echo && echo -e "\\$K_APISERVER\\t${K_APISERVER}\\n\\$K_PODNETWORK\\t${K_PODNETWORK}\\n\\$YAML\\t${YAML}"
   alert2 "Install Kubernetes Dashboard" "./'${K8S_DASHBOARD_SCRIPT}'"
-  alert2 "Join Nodes" "/usr/local/bin/#{SSHJOINNODES}"
+  alert2 "Join Nodes" "/usr/local/bin/#{SSH_JOINNODES}"
 }
 
 ################## GO ############################
