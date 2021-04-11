@@ -10,6 +10,5 @@ simple.sh
 sync.hosts.sh
 ubuntu.k8s.sh
 controller.sh
-bash_history
 coredns/
 bash_history.sh
