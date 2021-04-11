@@ -214,7 +214,7 @@ EOF
 
 $APPEND_ETC_BASHRC = <<EOF
 echo #{MSG} Running: \\$APPEND_ETC_BASHRC
-bashrc=shrc
+bashrc=/etc/bash.bashrc
 library=/etc/k.library
 
 echo '### START BASHRC' >> ${bashrc}
