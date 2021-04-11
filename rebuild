@@ -2,20 +2,21 @@
 function blue { echo -n "$(tput setaf 6;tput setab 4)${*}$(tput sgr 0)"; }
 
 if [ ${#} -eq 0 ]; then
-   p=`cat POD_CT` && m=`cat MSTR_CT` && i=0 && m=0 && pods= && master=
-   while [ $i -lt ${p} ]; do
-      i=`expr ${i} + 1` && pods="${pods} node${i}"
-   done
-   boxes="master ${pods}"
-   echo -n "Rebuilding env  " && blue "${PWD##*/}" && echo "  for ${boxes}"
+  p=`cat POD_CT` && m=`cat MSTR_CT` && i=0 && m=0 && pods= && master=
+  while [ $i -lt ${p} ]; do
+    i=`expr ${i} + 1` && pods="${pods} node${i}"
+  done
+  boxes="master ${pods}"
+  echo -n "Rebuilding env  " && blue "${PWD##*/}" && echo "  for ${boxes}"
 
-     read -p "Go? (Y/n): " yn
-     yn=${yn:-Y}
-     if [[ ! $yn = "Y" ]]; then exit ${LINENO}; fi
-   CMD="vagrant destroy -f ${boxes}" && ${CMD}
-   CMD="up" && time ${CMD}
+  read -p "Go? (Y/n): " yn
+  yn=${yn:-Y}
+  if [[ ! $yn = "Y" ]]; then exit ${LINENO}; fi
+
+  CMD="vagrant destroy -f ${boxes}" && ${CMD}
+  CMD="up" && ${CMD}
 else
-   destroy ${@}
-   time up ${@}
+  destroy ${@}
+  up ${@}
 fi
 prov -p=SyncAll
