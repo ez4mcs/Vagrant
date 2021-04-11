@@ -35,7 +35,7 @@ done
 #if [ ! -d ${target} ]; then mkdir ${target}; fi
 #for f in $(ls -1 ${src}/); do if [ ! -d ${src}/${f} ]; then ln -fn ${src}/${f} ./${target}/${f}; fi; done
 
-
-touch CTLR_CT
-touch MSTR_CT
-touch POD_CT
+for f in CTLR_CT MSTR_CT POD_CT; do
+	cat ${base}/${f} >./${f}
+	git update-index --assume-unchanged ${f}
+done
