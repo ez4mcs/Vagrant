@@ -18,11 +18,11 @@ if [ ${#} -eq 0 ]; then
   boxes="master ${pods}"
 
 ### DRIVER ###
-  echo -n "Rebuilding env  " && blue "${PWD##*/}" && echo "  for ${boxes}"
+  echo -n "Rebuilding env  " && blue "${PWD##*/}" && echo "  ${boxes}"
   read -p "Go? (Y/n): " yn
   yn=${yn:-Y}
   if [[ ! $yn = "Y" ]]; then exit ${LINENO}; fi
-
+  echo going... ... ...
   vagrant destroy -f ${boxes}
   up
 else
