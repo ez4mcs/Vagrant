@@ -24,7 +24,7 @@ find ${base}/_shared_assets -type d|sed "s/\.\.\/\k8s-cluster/\./"|xargs mkdir 2
 for dir in $(find ${base}/_shared_assets -type d|sed "s/\.\.\/\k8s-cluster/\./"); do
 	target=./${dir} && src=${base}/${dir}
 	if [ ! -d ${target} ]; then mkdir ${target}; fi
-	for f in $(ls -1 ${src}/); do if [ ! -d ${src}/${f} ]; then ln -fn ${src}/${f} ./${target}/${f}; fi; done
+	for f in $(ls -1A ${src}/); do if [ ! -d ${src}/${f} ]; then ln -fn ${src}/${f} ./${target}/${f}; fi; done
 done
 
 # MIRROR NODE CT FILES, DONT TRACK CHANGES
