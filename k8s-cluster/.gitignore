@@ -10,5 +10,5 @@ simple.sh
 sync.hosts.sh
 ubuntu.k8s.sh
 controller.sh
-coredns/
 bash_history.sh
+_shared_assets/git/

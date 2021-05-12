@@ -836,7 +836,7 @@ date >> /etc/vagrant_provisioned_at
       subconfig.vm.synced_folder "/Users/brandonindia/Docker", "/root/Docker"
       subconfig.vm.synced_folder "/Users/brandonindia/Docker/private.assets/", "/root/private.assets/"
       subconfig.vm.synced_folder "/Users/brandonindia/Docker/public.assets/", "/root/public.assets/"
-      subconfig.vm.synced_folder "_shared_assets/git/", "/home/vagrant/git"
+      subconfig.vm.synced_folder "_shared_assets/ignored/", "/home/vagrant/git"
       subconfig.vm.synced_folder "_shared_assets/software/", "/home/vagrant/software"
 
       subconfig.vm.box = "#{IMAGE}"
