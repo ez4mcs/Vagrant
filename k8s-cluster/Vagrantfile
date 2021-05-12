@@ -1,14 +1,16 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 ### SET THIS TO -test (DASH TEST) TO ENABLE TEST MODE ###
-TEST=""
+TEST="" # "" OR "-test" (DASH TEST)
 INTERACTIVE = true
 LIFECYCLE = "dev#{TEST}"
 DOMAIN = "anytown.usa"
 
 MIRROR_SSH_PORT_ADD = 0; MIRROR_FORWARD_PORT_ADD=0;
+TEST_SSH_PORT_ADD = 0; TEST_FORWARD_PORT_ADD=0;
 PURPOSE = "#{File.basename(Dir.getwd)}#{TEST}"
 if PURPOSE.include? "mirror"; MIRROR_SSH_PORT_ADD += 10000; MIRROR_FORWARD_PORT_ADD=1; end
+if PURPOSE.include?   "test"; TEST_SSH_PORT_ADD += 20000; TEST_FORWARD_PORT_ADD=2; end
 HOSTNAME_SUFFIX = "#{PURPOSE}.#{LIFECYCLE}.#{DOMAIN}"
 
 POD_CT = File.read("./POD_CT").to_i
@@ -79,7 +81,7 @@ for i in (0..CTLR_CT+MSTR_CT+POD_CT - 1) do
 end
 
 # WRITES:   /usr/local/bin/
-SSH_PODNODES="podnodes"
+SSH_PODNODES="sshpodnodes"
 SSH_ALLCLUSTER="sshall"
 SSH_MASTER="sshmaster"
 SSH_RESETNODES="resetnodes"
@@ -262,8 +264,14 @@ $ADHOC = ""
 ####################################################
       $CREATE_CLUSTER = <<-EOF
 script_list=()
+EOF
 
 
+
+WPMYSQL_APPORT = 32087
+WPMYSQL_PORT = 30937
+WPMYSQL_PORT_HOST = WPMYSQL_PORT + MIRROR_FORWARD_PORT_ADD + TEST_FORWARD_PORT_ADD
+$CREATE_CLUSTER += <<-EOF
 WORDPRESS_MYSQL_APP_SCRIPT=wordpress_mysql_app_deploy
 script_list+=("${WORDPRESS_MYSQL_APP_SCRIPT}")
 echo -e "############ write ${WORDPRESS_MYSQL_APP_SCRIPT} ############"
@@ -274,6 +282,7 @@ source /etc/k.library
 ### CREATES & DEPLOYS wordpress_mysql IN NAMESPACE
 ###
 ###  -n namespace NAMESPACE ${NAMESPACE}
+###  -p DEFAULT NODEPORT ${APPORT}
 ###  -o nodeport APPORT ${APPORT}
 ###  -u UNDEPLOY KUBECTL DELETE ${UNDEPLOY}
 ###  -s SETUP & VERIFY ${SETUP}
@@ -294,6 +303,16 @@ kubesystem="kube-system"
 thelist=()
 bin_dir=/usr/local/bin/
 
+for i in "$@"
+do
+case $i in
+-p)
+shift
+APPORT=#{WPMYSQL_APPORT}
+;;
+esac
+done
+
 ######### TEST MODE SUPERCEEDS EVERYRHING ########
 function do_test {
   echo "### TEST MODE ###"
@@ -304,7 +323,6 @@ function do_test {
   #  then un-go && pass do_test || fail do_test
   #  else    go && pass do_test || fail do_test
   #fi
-#  if [ ${APPORT} -gt 0 ]; then do_nodeport create; fi
 
   #init && verify && check_podnetwork && check_manifest && pass "$(basename $0)" || fail "$(basename $0)"
 }
@@ -313,85 +331,103 @@ function do_test {
 ### LIST OF REMOTE DIRECTORY STRUCTURE
 ###
 function init {
-  echo init
-  root="/"
-  thelist=()
-  thelist+=("${root}var/www")
-  thelist+=("${root}var/www/html-${NAMESPACE}")
-  thelist+=("${root}var/lib/mysql-${NAMESPACE}")
-  good2 "Directories" "${thelist[@]}"
+echo init
+root="/"
+thelist=()
+thelist+=("${root}var/www")
+thelist+=("${root}var/www/html-${NAMESPACE}")
+thelist+=("${root}var/lib/mysql-${NAMESPACE}")
+good2 "Directories" "${thelist[@]}"
 }
 ##################################################
 function go {
-  echo -e "Going for ${APP} @ namespace: ${NAMESPACE}\\n"
-  if [ ${APPORT} -gt 0 ]; then do_nodeport create
-    else if check_podnetwork; then deploy; fi
-  fi
+
+echo -e "Going for ${APP} @ namespace: ${NAMESPACE}\\n"
+if check_podnetwork; then deploy && do_nodeport create; fi
+
 }
 ##################################################
 function un-go {
-  echo -e "Undeploying ${APP} @ namespace: ${NAMESPACE}\\n"
-  if check_podnetwork; then remove; fi
-  #do_nodeport delete
+
+echo -e "Undeploying ${APP} @ namespace: ${NAMESPACE}\\n"
+if check_podnetwork; then remove; fi
+#do_nodeport delete
+
 }
 ##################################################
 function deploy {
-  if check_manifest; then kubectl create -k ${APPLOC}/${APP}/; fi
+
+if check_manifest; then kubectl create -k ${APPLOC}/${APP}/; fi
+
 }
 ##################################################
 function remove {
-  if check_manifest; then kubectl delete -k ${APPLOC}/${APP}/; fi
+
+if check_manifest; then kubectl delete -k ${APPLOC}/${APP}/; fi
+
 }
 ##################################################
 function check_podnetwork {
-  if kubectl get pods -n ${kubesystem}|grep calico >/dev/null; then return 0; fi
-  error "deploy pod network" "kubectl create -f ${K_YAML_CALICO}" && return 1;
+
+if kubectl get pods -n ${kubesystem}|grep calico >/dev/null; then return 0; fi
+error "deploy pod network" "kubectl create -f ${K_YAML_CALICO}" && return 1;
+
 }
 ##################################################
 function check_manifest {
-  if [ -f ${APPLOC}/${APP}/${manifest} ]; then return 0; fi
-  error "${manifest}" "not found in ${APPLOC}/${APP}/"; return 1
+
+if [ -f ${APPLOC}/${APP}/${manifest} ]; then return 0; fi
+error "${manifest}" "not found in ${APPLOC}/${APP}/"; return 1
+
 }
 ##################################################
 function getthelist {
-  alert2 "Directories" "${thelist[@]}"
+
+alert2 "Directories" "${thelist[@]}"
+
 }
 ##################################################
 function setup {
-  echo -e "Setting up ${APP} @ namespace: ${NAMESPACE}"
-  CMD="sudo mkdir"
-  if [ ${#thelist[@]} = 0 ]; then return 1; fi
-  for d in ${thelist[@]}; do setup="${setup}${CMD} ${d} 2> /dev/null;"; done
-    # echo "setup: ${setup}"
-  ${bin_dir}/#{SSH_PODNODES} "${setup}"
+
+echo -e "Setting up ${APP} @ namespace: ${NAMESPACE}"
+CMD="sudo mkdir"
+if [ ${#thelist[@]} = 0 ]; then return 1; fi
+for d in ${thelist[@]}; do setup="${setup}${CMD} ${d} 2>/dev/null;"; done
+  # echo "setup: ${setup}"
+${bin_dir}/#{SSH_PODNODES} "${setup}"
+
 }
 ##################################################
 function verify {
-  echo Verifying for namespace: ${NAMESPACE}
-  CMD="sudo mkdir"
-  for d in ${thelist[@]}; do setup="${setup}${CMD} ${d} 2> /dev/null;"; done
-  RC=0 && for d in ${thelist[@]}; do verify="${verify}if ! ls ${d} >/dev/null 2>&1; then echo -n FAILED@ && echo \\\$(hostname -f) && exit 1; fi;"; done
-    # echo "verify: ${verify}"
-  if ! ${bin_dir}/#{SSH_PODNODES}  "${verify}"; then RC=99; fi;
-  return ${RC}
+
+echo Verifying for namespace: ${NAMESPACE}
+CMD="sudo mkdir"
+for d in ${thelist[@]}; do setup="${setup}${CMD} ${d} 2>/dev/null;"; done
+RC=0 && for d in ${thelist[@]}; do verify="${verify}if ! ls ${d} >/dev/null 2>&1; then echo -n FAILED@ && echo \\\$(hostname -f) && exit 1; fi;"; done
+  # echo "verify: ${verify}"
+if ! ${bin_dir}/#{SSH_PODNODES}  "${verify}"; then RC=99; fi;
+return ${RC}
+
 }
 ##################################################
 function teardown {
-  alert2 "Removing" "${thelist[@]}"
-  CMD="sudo rm -rf"
-  if [ ${#thelist[@]} = 0 ]; then return 0; fi
-  for d in ${thelist[@]}; do teardown="${teardown}${CMD} ${d};"; done
-    # echo "teardown: ${teardown}"
-  ${bin_dir}/#{SSH_PODNODES}  "${teardown}";
+
+alert2 "Removing" "${thelist[@]}"
+CMD="sudo rm -rf"
+if [ ${#thelist[@]} = 0 ]; then return 0; fi
+for d in ${thelist[@]}; do teardown="${teardown}${CMD} ${d};"; done
+  # echo "teardown: ${teardown}"
+${bin_dir}/#{SSH_PODNODES}  "${teardown}";
+
 }
 ##################################################
 function do_nodeport {
-if [ ${APPORT} -gt 0 ]; then
-cat <<STP | kubectl ${1} -f -
+if [ ${APPORT} -le 0 ]; then APPORT=#{WPMYSQL_APPORT}; fi
+cat <<STP | kubectl ${1} -f - && echo node port #{WPMYSQL_PORT_HOST} exposed
 kind: Service
 apiVersion: v1
 metadata:
-  name: wordpress-service-np-${NAMESPACE}
+  name: wordpress-service-${NAMESPACE}-np
   namespace: ${NAMESPACE}
   labels:
     name: wordpress
@@ -399,14 +435,13 @@ spec:
   type: NodePort
   ports:
   - port: ${APPORT}
-    nodePort: '`expr 30937 + #{MIRROR_FORWARD_PORT_ADD}`'
+    nodePort: '#{WPMYSQL_PORT_HOST}'
     targetPort: 80
     protocol: TCP
     name: http
   selector:
     app: wordpress
 STP
-fi
 
 }
 ##### END OF APPORT #####
@@ -419,21 +454,25 @@ if [ ${TESTMODE} -gt 0 ]; then
   do_test
 else
 ################## VERIFY ########################
-  if [ ${VERIFY} -gt 0 ]
-    then verify && pass "$(basename $0)" || fail2 "$(basename $0):" "run setup with -s" && exit 2
-  else
+if [ ${VERIFY} -gt 0 ]
+  then verify && pass "$(basename $0)" || fail2 "$(basename $0):" "run setup with -s" && exit 2
+else
 ################## DELETE ########################
-    if [ ${UNDEPLOY} -gt 0 ]
-      then un-go
-    else
+if [ ${UNDEPLOY} -gt 0 ]
+  then un-go
+else
 ################## SETUP #########################
-      if [ ${SETUP} -gt 0 ]
-        then setup && verify && pass "$(basename $0)"
-      else
+if [ ${SETUP} -gt 0 ]
+  then setup && verify && pass "$(basename $0)"
+else
+################ APP PORT ########################
+if [ ${APPORT_DEFAULT} ]
+  then do_nodeport create
+else
 ################### GO ###########################
-        verify && pass "$(basename $0)" && go || fail2 "$(basename $0):" "run setup first with -s?" && exit 3
+verify && pass "$(basename $0)" && go || fail2 "$(basename $0):" "run setup first with -s?" && exit 3
 ##################################################
-fi;fi;fi;fi;
+fi;fi;fi;fi;fi;
 
 ##################################################
 ##################################################
@@ -441,12 +480,15 @@ fi;fi;fi;fi;
 # END
 ##################################################
 ' > /root/${WORDPRESS_MYSQL_APP_SCRIPT}
+EOF
 
 
 
 
 
-
+DASHBOARD_PORT = 30002
+DASHBOARD_PORT_HOST = DASHBOARD_PORT + MIRROR_FORWARD_PORT_ADD + TEST_FORWARD_PORT_ADD
+      $CREATE_CLUSTER += <<-EOF
 K8S_DASHBOARD_SCRIPT=dashboard_install
 script_list+=("${K8S_DASHBOARD_SCRIPT}")
 echo -e "############ write ${K8S_DASHBOARD_SCRIPT}"
@@ -461,27 +503,69 @@ source /etc/k.library
 function deploy {
   if [ -n "${K_YAML_DASHBOARD}" ]; then
     kubectl create -f ${K_YAML_DASHBOARD}
-    kubectl create -f ./yaml/kubernetes-dashboard/dashboard-service-np.yaml
-    kubectl -n kubernetes-dashboard describe secret $(kubectl -n kubernetes-dashboard get secret | grep admin-user | awk \"{print \\$1}\")
+    expose_dashboard create
+    gettoken
   else
     echo env K_YAML_DASHBOARD not set
   fi
 }
 function un-go {
-  kubectl delete -f ./yaml/kubernetes-dashboard/dashboard-service-np.yaml
+  expose_dashboard delete
   kubectl delete -f ${K_YAML_DASHBOARD}
 }
 function gettoken {
   kubectl -n kubernetes-dashboard describe secret $(kubectl -n kubernetes-dashboard get secret | grep admin-user | awk \"{print \\$1}\") | grep token \
     |grep token:|awk '\\\''{print $2}'\\\''
-
+  echo && echo https://localhost:#{DASHBOARD_PORT_HOST}/#/login
 }
 
+##################################################
+function expose_dashboard {
+cat <<STP | kubectl ${1} -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kubernetes-dashboard
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kubernetes-dashboard
+---
+kind: Service
+apiVersion: v1
+metadata:
+  namespace: kubernetes-dashboard
+  name: kubernetes-dashboard-service-np
+  labels:
+    k8s-app: kubernetes-dashboard
+spec:
+  type: NodePort
+  ports:
+  - port: 8443
+    nodePort: '#{DASHBOARD_PORT_HOST}'
+    targetPort: 8443
+    protocol: TCP
+  selector:
+    k8s-app: kubernetes-dashboard
+STP
+
+}
+##### END OF APPORT #####
 ################## GO ############################
 if [ ${UNDEPLOY} -gt 0 ];
   then un-go;
   else if [ ${TOKEN} -gt 0 ]; then gettoken;
-    else deploy;
+    else deploy
   fi
 fi
 ##################################################
@@ -630,6 +714,35 @@ if [ -f /joincluster ]; then echo wrote /joincluster; fi
 
 
 
+
+RESET_CLUSTER_SCRIPT=reset_cluster
+script_list+=("${RESET_CLUSTER_SCRIPT}")
+echo -e "############ write ${RESET_CLUSTER_SCRIPT} ############"
+echo '#!/bin/bash
+########################
+###
+### RESETS ALL NOES AND MASTER
+###
+########################
+
+function kdrainall  { echo kdrainall && kubectl get nodes --no-headers|grep -v master|awk '\\\''{print \$1}'\\\''|xargs kubectl drain --delete-emptydir-data --ignore-daemonsets ; }
+function kdeleteall { echo kdeleteall && kubectl get nodes --no-headers|grep -v master|awk '\\\''{print \$1}'\\\''|xargs kubectl delete node ; }
+function kreset { echo kreset && sudo su - -c "kubeadm reset -f" && sudo rm -rf /joincluster && sudo rm -rf ${HOME}/.kube && sudo rm -rf /etc/cni/net.d; }
+
+kdrainall && kdeleteall && echo resetnodes && /usr/local/bin/resetnodes && kreset
+
+
+##################################################
+##################################################
+##################################################
+# END
+##################################################
+' > /root/${RESET_CLUSTER_SCRIPT}
+
+
+
+
+
 ################################################
 ###
 ### SET PERMISSIONS FOR SCRIPTS IN script_list
@@ -651,7 +764,7 @@ EOF
 ### MASTER ###
 ###
    config.vm.define "#{MASTER}" do |subconfig|
-      PORT = 2300 + MIRROR_SSH_PORT_ADD
+      PORT = 2300 + MIRROR_SSH_PORT_ADD + TEST_SSH_PORT_ADD
       $NTP = $ETC_INITD_NTPSYNC + <<-EOF
 #{NTP}
       EOF
@@ -671,6 +784,13 @@ apt-get -qq install unzip nmap jq
 #{CONTAINER_CONFIG}
 #{K8S}
       EOF
+      subconfig.vm.provision "konfig", type: "shell", run: "never", name: "konfig", inline: <<-EOF
+ip=$(/sbin/ifconfig enp0s8|grep -E 'inet[^0-9]'|awk '{print $2}')
+sed -i "s/^ExecStart=$/Environment=\\"KUBELET_EXTRA_ARGS=--node-ip=$ip\\"\\\\nExecStart=/" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+systemctl daemon-reload
+systemctl restart kubelet
+echo added KUBELET_EXTRA_ARGS=--node-ip=$ip
+     EOF
 ###
 ### MASTER ###
 ###
@@ -701,12 +821,12 @@ date >> /etc/vagrant_provisioned_at
          EOF
 
           ### 30937 is app wp_mysql
-        subconfig.vm.network "forwarded_port", guest: 30937, host: 30937 + MIRROR_FORWARD_PORT_ADD
+        subconfig.vm.network "forwarded_port", guest: WPMYSQL_PORT_HOST, host: WPMYSQL_PORT_HOST
           ### 30002 is app kubernetes-dashboard
-        subconfig.vm.network "forwarded_port", guest: 30002, host: 30002 + MIRROR_FORWARD_PORT_ADD
-        subconfig.vm.network "forwarded_port", guest: 8001, host: 8001 + MIRROR_FORWARD_PORT_ADD
-        subconfig.vm.network "forwarded_port", guest: 32370, host: 32370 + MIRROR_FORWARD_PORT_ADD
-        subconfig.vm.network "forwarded_port", guest: 31162, host: 31162 + MIRROR_FORWARD_PORT_ADD
+        subconfig.vm.network "forwarded_port", guest: DASHBOARD_PORT_HOST, host: DASHBOARD_PORT_HOST
+        subconfig.vm.network "forwarded_port", guest: 8001, host: 8001 + MIRROR_FORWARD_PORT_ADD + TEST_FORWARD_PORT_ADD
+        subconfig.vm.network "forwarded_port", guest: 32370, host: 32370 + MIRROR_FORWARD_PORT_ADD + TEST_FORWARD_PORT_ADD
+        subconfig.vm.network "forwarded_port", guest: 31162, host: 31162 + MIRROR_FORWARD_PORT_ADD + TEST_FORWARD_PORT_ADD
 ###
 ### MASTER ### PORTS
 ###
@@ -760,7 +880,8 @@ EOF
    (1..POD_CT).each do |i|
       config.vm.define "#{NODE}#{i}" do |subconfig|
 MIRROR_SSH_PORT_ADD = 0; if PURPOSE.include? "mirror"; MIRROR_SSH_PORT_ADD += 10000; end
-      PORT = 2300 + i + MIRROR_SSH_PORT_ADD
+TEST_SSH_PORT_ADD = 0; if PURPOSE.include? "test"; TEST_SSH_PORT_ADD += 20000; end
+      PORT = 2300 + i + MIRROR_SSH_PORT_ADD + TEST_SSH_PORT_ADD
          subconfig.vm.provision "SyncAll", type: "shell", run: "never", name: "SyncAll", inline: $ETC_HOSTS + $WRITE_SYNC + <<-EOF
 /bin/bash /etc/init/synchosts.sh
       EOF
@@ -774,6 +895,13 @@ MIRROR_SSH_PORT_ADD = 0; if PURPOSE.include? "mirror"; MIRROR_SSH_PORT_ADD += 10
 #{CONTAINER_CONFIG}
 #{K8S}
          EOF
+         subconfig.vm.provision "konfig", type: "shell", run: "never", name: "konfig", inline: <<-EOF
+ip=$(/sbin/ifconfig enp0s8|grep -E 'inet[^0-9]'|awk '{print $2}')
+sed -i "s/^ExecStart=$/Environment=\\"KUBELET_EXTRA_ARGS=--node-ip=$ip\\"\\\\nExecStart=/" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+systemctl daemon-reload
+systemctl restart kubelet
+echo added KUBELET_EXTRA_ARGS=--node-ip=$ip
+        EOF
          subconfig.vm.provision "Join", type: "shell", run: "once", name: "Join", inline: $JOIN
          subconfig.vm.provision "Last", type: "shell", run: "once", name: "Last", inline: $WRITE_SYNC
          subconfig.vm.provision "Final", type: "shell", run: "once", name:"Final", inline: <<-EOF
@@ -810,7 +938,7 @@ systemctl start kubelet
          subconfig.vm.provider "#{PROVIDER}" do |v|
             v.name = "#{VM_NAME_NODE}#{i}"
             v.memory = 1024
-            v.cpus = 2
+            v.cpus = 1
          end
       end
    end
@@ -851,7 +979,7 @@ MSG = "***** %%%%% ***** %%%%% ********** %%%%% ***** %%%%% *****"
 ### SOFTWARE ###
 ###
 
-K8S_VERSION_20="1.20.2-00"
+K8S_VERSION_20="1.20.6-00"
 K8S_VERSION_19="1.19.7-00"
 K8S_VERSION_18="1.18.15-00"
 K8S_VERSION_17="1.17.17-00"
@@ -997,11 +1125,13 @@ function good2   { println '" + '\\\'' + "'\t\e[32m(%s) \e[m%s'" + '\\\'' + "' \
 function alert   { println '" + '\\\'' + "'\t\e[33m%s\e[m'" + '\\\'' + "' \"$*\"; }
 function alert2  { println '" + '\\\'' + "'\t\e[33m(%s) \e[m%s'" + '\\\'' + "' \"$1\" \"${*:2}\"; }
 function showalias { echo ${BASH_ALIASES[*]}; }
-function getservices { systemctl list-units --type=service; }
-function getactive { systemctl list-units --type=service --state=active; }
-function getinactive { systemctl list-units --type=service --state=inactive; }
-function getdead { getinactive|grep dead; }
-function getrunning { systemctl list-units --type=service --state=running; }
+
+function getservices  { systemctl list-units --type=service; }
+function getactive    { systemctl list-units --type=service --state=active; }
+function getinactive  { systemctl list-units --type=service --state=inactive; }
+function getdead      { getinactive|grep dead; }
+function getrunning   { systemctl list-units --type=service --state=running; }
+
 function verify {
    if [ -f ${1} ]; then echo ${1} exists
    else echo fail; return 1; fi
@@ -1023,6 +1153,7 @@ _optlist_+=(\"v\")
 _optlist_+=(\"s\")
 _optlist_+=(\"j\")
 _optlist_+=(\"k\")
+_optlist_+=(\"p\")
 options_msg=\"options: \"
 for o in ${_optlist_[@]}; do
   options_msg=\"${options_msg}${o}|\"
@@ -1042,6 +1173,7 @@ function _help_ {
   println '" + '\\\'' + "'\t\e[33m-s: SETUP\e[m'" + '\\\'' + "' \"$*\";
   println '" + '\\\'' + "'\t\e[33m-j: JOIN\e[m'" + '\\\'' + "' \"$*\";
   println '" + '\\\'' + "'\t\e[33m-k: TOKEN\e[m'" + '\\\'' + "' \"$*\";
+  println '" + '\\\'' + "'\t\e[33m-p: APPORT_DEFAULT\e[m'" + '\\\'' + "' \"$*\";
 }
 
 TESTMODE=0
@@ -1052,8 +1184,9 @@ APPORT=0
 VERIFY=0
 JOIN=0
 TOKEN=0
+APPORT_DEFAULT=0
 
-_opts_=\"n:o:stuvjhk\"
+_opts_=\"n:o:stuvjhkp\"
 while getopts ${_opts_} _option_
 do
 case \"${_option_}\"
@@ -1066,8 +1199,9 @@ v) VERIFY=1;;
 s) SETUP=1;;
 j) JOIN=1;;
 k) TOKEN=1;;
+p) APPORT_DEFAULT=1;;
 H1) _help_ \"NO ARGS\" && exit 0;;
-H0) usage \"NO ARGS\" \": go\\n-n namespace: NAMESPACE\\n-o port: APPORT\\n-u: UNDEPLOY\\n-t: TEST\\n-s: SETUP\\n-v: VERIFY\\n-j: JOIN\\n-k: TOKEN\" && exit 0;;
+H0) usage \"NO ARGS\" \": go\\n-n namespace: NAMESPACE\\n-o port: APPORT\\n-u: UNDEPLOY\\n-t: TEST\\n-s: SETUP\\n-v: VERIFY\\n-j: JOIN\\n-k: TOKEN\\n-p: APPORT_DEFAULT\" && exit 0;;
 h) _help_ && exit 0;;
 *) usage && exit 1;;
 esac
@@ -1110,9 +1244,13 @@ alias kpv=\"kget pv -o wide\"
 alias kpva=\"kget pv -o wide -A\"
 
 alias kpod=\"kget pod -o wide\"
+alias kpods=\"kget pod -o wide\"
 alias kpoda=\"kget pod -o wide -A\"
+alias kpodsa=\"kget pod -o wide -A\"
 alias kpodw=\"kget pod -o wide --watch\"
+alias kpodsw=\"kget pod -o wide --watch\"
 alias kpodaw=\"kget pod -o wide -A --watch\"
+alias kpodsaw=\"kget pod -o wide -A --watch\"
 alias kservice=\"kget svc -o wide\"
 alias kservicew=\"kget svc -o wide --watch\"
 alias kservicea=\"kget svc -o wide -A\"
@@ -1144,9 +1282,11 @@ alias kgetns=\"kubectl get namespaces --show-labels\"
 
 alias kdrn=\"echo Usage: kubectl drain \\\<node-name\\\> --ignore-daemonsets --delete-emptydir-data\"
 alias kdlt=\"echo Usage: kubectl delete node \\\<node-name\\\>\"
+
 function kdrain0 { for n in \${@}; do kubectl drain \${n} --delete-local-data=true --ignore-daemonsets; done; }
 function kdrain1 { for n in \${@}; do kubectl drain \${n} --delete-emptydir-data --ignore-daemonsets; done; }
 function kdelete { for n in \${@}; do kubectl delete node \${n}; done  ; }
+
 function kdrainall0  { kdrain0 \$(kubectl get nodes --no-headers|grep -v master|awk '" + '\\\'' + "'{print \$1}'" + '\\\'' + "') ; }
 function kdrainall1  { kdrain1 \$(kubectl get nodes --no-headers|grep -v master|awk '" + '\\\'' + "'{print \$1}'" + '\\\'' + "') ; }
 function kdrainall  { kubectl get nodes --no-headers|grep -v master|awk '" + '\\\'' + "'{print \$1}'" + '\\\'' + "'|xargs kubectl drain --delete-emptydir-data --ignore-daemonsets ; }
@@ -1155,6 +1295,7 @@ function kdeleteall { kubectl get nodes --no-headers|grep -v master|awk '" + '\\
 function ksetns { if [ -n \${1} ];then kubectl config set-context --current --namespace=\${1};else kubectl config set-context --current --namespace=default; fi ; }
 alias kreset=\"sudo su - -c '" + '\\\'' + "'kubeadm reset -f'" + '\\\'' + "' \&\& sudo rm -rf /joincluster \&\& sudo rm -rf ${HOME}/.kube \&\& sudo rm -rf /etc/cni/net.d\"
 
+alias token=\"\${HOME}/dashboard_install -k\"
 
 info $(grep \"DISTRIB_DESCRIPTION\" /etc/lsb-release)
 blue \"IP Route:\" && echo && ip route
@@ -1213,7 +1354,10 @@ echo
 echo -n \"docker: \" && systemctl status docker | grep --color=never Active
 echo -n \"containerd: \" && systemctl status containerd | grep --color=never Active
 echo -n \"kubelet: \" && systemctl status kubelet | grep --color=never Active
-
+grey \"Contents of /etc/kubernetes/manifests: \"
+/bin/ls -Ahltr --color=always /etc/kubernetes/manifests
+GO_HOME=/usr/local/go
+export PATH=$PATH:$GO_HOME/bin
 '"
 
 NOTHING = ""
