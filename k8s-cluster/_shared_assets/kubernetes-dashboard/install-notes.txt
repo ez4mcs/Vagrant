@@ -1,11 +1,11 @@
 #1
-kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0/aio/deploy/recommended.yaml 
+kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0/aio/deploy/recommended.yaml
 kubectl create serviceaccount dashboard -n default
 kubectl create clusterrolebinding dashboard-admin -n default  --clusterrole=cluster-admin  --serviceaccount=default:dashboard
 
 kubectl delete clusterrolebinding dashboard-admin -n default
 kubectl delete serviceaccount dashboard -n default
-kubectl delete -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0/aio/deploy/recommended.yaml 
+kubectl delete -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0/aio/deploy/recommended.yaml
 
 k delete ns kubernetes-dashboard
 
@@ -17,3 +17,11 @@ kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0/
 kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.5/aio/deploy/recommended.yaml
 kubectl apply -f yaml/kubernetes-dashboard/dashboard-service-np.yaml
 kubectl apply -f yaml/kubernetes-dashboard/dashboard-service-np-mirror.yaml
+
+
+K8S Dashboard
+User: admin-user
+URL: https://localhost:30002/#/login  <-- if blocked by NET::ERR_CERT_INVALID error
+                                          to bypass type into Chrome: thisisunsafe
+Token Command:
+kubectl -n kubernetes-dashboard describe secret $(kubectl -n kubernetes-dashboard get secret | grep admin-user | awk "{print \$1}")
