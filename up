@@ -1,5 +1,9 @@
 #!/bin/bash
 source ${HOME}/bin/library
+function usage {
+    fail No Vagrant file
+}
+if [ ! -f ./Vagrantfile ]; then usage && exit $LINENO; fi
 for i in "$@"
 do
 case $i in
